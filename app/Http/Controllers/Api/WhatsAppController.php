@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Services\ChatwootService;
 use Illuminate\Http\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,13 @@ use Twilio\TwiML\MessagingResponse;
 
 class WhatsAppController extends Controller
 {
+    protected ChatwootService $chatwootService;
+
+    public function __construct(ChatwootService $chatwootService)
+    {
+        $this->chatwootService = $chatwootService;
+    }
+
     /**
      * Handle incoming WhatsApp messages from Twilio.
      */
@@ -92,54 +100,20 @@ class WhatsAppController extends Controller
     {
         $twiml = new MessagingResponse();
 
-        // @todo: Idealmente, mover esta lógica para uma classe de serviço (e.g., ChatwootService)
         try {
-            $chatwootContactId = null;
+            // Search for existing contact or create a new one
+            $chatwootContactId = $this->chatwootService->searchContact($conversation->from_number);
 
-            // Step 1: SEARCH if the contact already exists in chatwoot.
-            $searchEndpoint = config('services.chatwoot.url') . '/api/v1/accounts/' . config('services.chatwoot.account_id') . '/contacts/search';
-            $searchResponse = Http::withHeaders(['api_access_token' => config('services.chatwoot.api_token')])
-                ->get($searchEndpoint, ['q' => $conversation->from_number]);
-
-            if ($searchResponse->successful() && count($searchResponse->json('payload')) > 0) {
-                $chatwootContactId = $searchResponse->json('payload.0.id');
-                Log::info("Contact found on Chatwoot with ID: {$chatwootContactId}");
-            } else {
-                Log::info("Contact not found, creating a new...");
-                $contactEndpoint = config('services.chatwoot.url') . '/api/v1/accounts/' . config('services.chatwoot.account_id') . '/contacts';
-                $contactResponse = Http::withHeaders(['api_access_token' => config('services.chatwoot.api_token')])
-                    ->post($contactEndpoint, [
-                        'inbox_id' => config('services.chatwoot.inbox_id'),
-                        'name' => 'Cliente WhatsApp ' . substr($conversation->from_number, -4),
-                        'phone_number' => $conversation->from_number
-                    ]);
-
-                if (!$contactResponse->successful()) {
-                    throw new \Exception('Failed to create contact in Chatwoot: ' . $contactResponse->body());
-                }
-                $chatwootContactId = $contactResponse->json('payload.contact.id');
-                Log::info("Contact created in Chatwoot with ID: {$chatwootContactId}");
+            if (!$chatwootContactId) {
+                $chatwootContactId = $this->chatwootService->createContact($conversation->from_number);
             }
 
             $conversation->chatwoot_contact_id = $chatwootContactId;
 
-            $conversationEndpoint = config('services.chatwoot.url') . '/api/v1/accounts/' . config('services.chatwoot.account_id') . '/conversations';
-            $conversationPayload = [
-                'inbox_id' => (int) config('services.chatwoot.inbox_id'),
-                'contact_id' => $chatwootContactId,
-                'source_id' => 'api'
-            ];
+            // Create a new conversation
+            $chatwootConversationId = $this->chatwootService->createConversation($chatwootContactId);
 
-            $conversationResponse = Http::withHeaders(['api_access_token' => config('services.chatwoot.api_token')])
-                ->post($conversationEndpoint, $conversationPayload);
-
-            if (!$conversationResponse->successful()) {
-                throw new \Exception('Failed to create a conversation in Chatwoot: ' . $conversationResponse->body());
-            }
-
-            $chatwootConversationId = $conversationResponse->json('id');
-
-            // Update conversation in our DB.
+            // Update conversation in our DB
             $conversation->status = 'with_agent';
             $conversation->chatwoot_conversation_id = $chatwootConversationId;
             $conversation->save();
@@ -162,20 +136,8 @@ class WhatsAppController extends Controller
     {
         Log::info("Forwarding a message to the conversation {$conversation->chatwoot_conversation_id} in Chatwoot.");
 
-        // @todo: Mover para ChatwootService
         try {
-            $conversationEndpoint = config('services.chatwoot.url') . '/api/v1/accounts/' . config('services.chatwoot.account_id') . '/conversations/' . $conversation->chatwoot_conversation_id . '/messages';
-            $conversationPayload = [
-                'content' => $messageBody,
-                'message_type' => 'incoming'
-            ];
-            $response = Http::withHeaders(['api_access_token' => config('services.chatwoot.api_token')])
-                ->post($conversationEndpoint, $conversationPayload);
-
-            if (!$response->successful()) {
-                throw new \Exception('Failed to forward message to Chatwoot: ' . $response->body());
-            }
-
+            $this->chatwootService->forwardMessage($conversation->chatwoot_conversation_id, $messageBody);
         } catch (\Exception $e) {
             Log::error("Error forwarding a message to Chatwoot: " . $e->getMessage());
         }
