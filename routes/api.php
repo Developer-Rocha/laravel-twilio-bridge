@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ChatwootWebhookController;
 use App\Http\Controllers\Api\WhatsAppController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -21,3 +22,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // Route to the WHATSAPP webhook of Twilio.
 Route::post('/whatsapp/webhook', [WhatsAppController::class, 'handleWebhook']);
+
+Route::post('/chatwoot/webhook', [ChatwootWebhookController::class, 'handle']);

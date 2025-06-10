@@ -30,5 +30,16 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
+    'chatwoot' => [
+        'url' => env('CHATWOOT_URL'),
+        'api_token' => env('CHATWOOT_API_TOKEN'),
+        'account_id' => env('CHATWOOT_ACCOUNT_ID'),
+        'inbox_id' => env('CHATWOOT_INBOX_ID'),
+    ],
+    'twilio' => [
+        'sid' => env('TWILIO_ACCOUNT_SID'),
+        'token' => env('TWILIO_AUTH_TOKEN'),
+        'whatsapp_number' => env('TWILIO_WHATSAPP_NUMBER'),
+    ],
 
 ];
