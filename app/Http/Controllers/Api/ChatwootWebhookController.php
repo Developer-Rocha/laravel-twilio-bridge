@@ -10,6 +10,24 @@ use Twilio\Rest\Client as TwilioClient;
 
 class ChatwootWebhookController extends Controller
 {
+    protected $twilio;
+    protected $accountSid;
+    protected $twilioNumber;
+
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->accountSid = config('services.twilio.sid');
+        $this->twilioNumber = config('services.twilio.whatsapp_number');
+        $twilioToken = config('services.twilio.token');
+
+        $this->twilio = new TwilioClient($this->accountSid, $twilioToken);
+    }
+
     public function handle(Request $request)
     {
         Log::info('Chatwoot Webhook Received:', $request->all());
@@ -34,12 +52,10 @@ class ChatwootWebhookController extends Controller
         }
 
         try {
-            $twilio = new TwilioClient(config('services.twilio.sid'), config('services.twilio.token'));
-
-            $twilio->messages->create(
+            $this->twilio->messages->create(
                 $conversation->from_number,
                 [
-                    'from' => config('services.twilio.whatsapp_number'),
+                    'from' => $this->twilioNumber,
                     'body' => $messageContent,
                 ]
             );
