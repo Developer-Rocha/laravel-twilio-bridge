@@ -101,4 +101,40 @@ class ChatwootService
             throw new \Exception('Failed to forward message to Chatwoot: ' . $response->body());
         }
     }
+
+    /**
+     * Forward a message with attachment to an existing Chatwoot conversation
+     */
+    public function forwardAttachment(int $conversationId, string $mediaUrl, string $mediaType, ?string $caption): void
+    {
+        try {
+            $mediaContent = Http::withBasicAuth(config('services.twilio.sid'), config('services.twilio.token'))
+                ->get($mediaUrl)
+                ->body();
+
+            $filename = basename(parse_url($mediaUrl, PHP_URL_PATH));
+
+            $response = Http::withHeaders(['api_access_token' => $this->apiToken])
+                ->asMultipart()
+                ->attach(
+                    'attachments[]',
+                    $mediaContent,
+                    $filename
+                )
+                ->post("{$this->baseUrl}/api/v1/accounts/{$this->accountId}/conversations/{$conversationId}/messages", [
+                    'content' => $caption,
+                    'message_type' => 'incoming'
+                ]);
+
+            if (!$response->successful()) {
+                throw new \Exception('Failed to forward attachment to Chatwoot: ' . $response->body());
+            }
+
+            Log::info("Attachment forwarded to Chatwoot conversation {$conversationId}");
+
+        } catch (\Exception $e) {
+            Log::error("Error in forwardAttachment: " . $e->getMessage());
+            throw $e;
+        }
+    }
 }

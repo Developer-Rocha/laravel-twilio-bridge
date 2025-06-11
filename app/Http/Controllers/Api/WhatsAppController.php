@@ -49,7 +49,7 @@ class WhatsAppController extends Controller
             case 'awaiting_menu_response':
                 return $this->handleMenuResponse($messageBody, $conversation);
             case 'with_agent':
-                $this->forwardMessageToChatwoot($messageBody, $conversation);
+                $this->forwardMessageToChatwoot($messageBody, $conversation, $request);
                 return response(new MessagingResponse(), 200)->header('Content-Type', 'text/xml');
             default:
                 Log::error("Unknown chat status: {$conversation->status}");
@@ -132,12 +132,19 @@ class WhatsAppController extends Controller
     /**
      * Forwards subsequent messages to an existing Chatwoot conversation.
      */
-    private function forwardMessageToChatwoot(string $messageBody, Conversation $conversation)
+    private function forwardMessageToChatwoot(string $messageBody, Conversation $conversation, Request $request)
     {
         Log::info("Forwarding a message to the conversation {$conversation->chatwoot_conversation_id} in Chatwoot.");
 
         try {
-            $this->chatwootService->forwardMessage($conversation->chatwoot_conversation_id, $messageBody);
+            if ((int) $request->input('NumMedia', 0) > 0) {
+                $mediaUrl = $request->input('MediaUrl0');
+                $mediaType = $request->input('MediaContentType0');
+                $this->chatwootService->forwardAttachment($conversation->chatwoot_conversation_id, $mediaUrl, $mediaType, $messageBody);
+            }
+            else {
+                $this->chatwootService->forwardMessage($conversation->chatwoot_conversation_id, $messageBody);
+            }
         } catch (\Exception $e) {
             Log::error("Error forwarding a message to Chatwoot: " . $e->getMessage());
         }
