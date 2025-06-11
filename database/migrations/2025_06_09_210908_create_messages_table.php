@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('conversation_id')
                 ->constrained('conversations')
                 ->onDelete('cascade');
-            $table->text('body');
+            $table->text('body')->nullable();;
             $table->string('direction');
             $table->string('twilio_sid')->nullable()->index();
             $table->timestamps();

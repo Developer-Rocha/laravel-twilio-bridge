@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Twilio\Rest\Client as TwilioClient;
 
 class ChatwootWebhookController extends Controller
@@ -41,9 +43,15 @@ class ChatwootWebhookController extends Controller
             return response()->json(['status' => 'private_note_ignored']);
         }
 
-        $chatwootConversationId = $request->input('conversation.id');
         $messageContent = $request->input('content');
+        $attachments = $request->input('attachments', []);
 
+        // Ignore empty message.
+        if (empty($messageContent) && count($attachments) === 0) {
+            return response()->json(['status' => 'empty_message_ignored']);
+        }
+
+        $chatwootConversationId = $request->input('conversation.id');
         $conversation = Conversation::where('chatwoot_conversation_id', $chatwootConversationId)->first();
 
         if (!$conversation) {
@@ -52,18 +60,37 @@ class ChatwootWebhookController extends Controller
         }
 
         try {
-            $this->twilio->messages->create(
-                $conversation->from_number,
-                [
-                    'from' => $this->twilioNumber,
-                    'body' => $messageContent,
-                ]
-            );
+            $mediaUrl = null;
+
+            if (count($attachments) > 0) {
+                $attachmentUrl = $attachments[0]['data_url'];
+
+                $fileContent = Http::withHeaders(['api_access_token' => config('services.chatwoot.api_token')])
+                    ->get($attachmentUrl)
+                    ->body();
+
+                $filename = 'from_chatwoot/' . uniqid() . '_' . basename($attachmentUrl);
+                Storage::disk('public')->put($filename, $fileContent);
+
+                $mediaUrl = Storage::disk('public')->url($filename);
+                Log::info("Chatwoot file saved publicly for sending: {$mediaUrl}");
+            }
+
+            $messageData = [
+                'from' => $this->twilioNumber,
+                'body' => $messageContent,
+            ];
+
+            if ($mediaUrl) {
+                $messageData['mediaUrl'] = [$mediaUrl];
+            }
+
+            $this->twilio->messages->create($conversation->from_number, $messageData);
 
             Log::info("Agent's message sent to {$conversation->from_number}");
 
             $conversation->messages()->create([
-                'body' => $messageContent,
+                'body' => $messageContent ?? '[Mídia enviada pelo agente]',
                 'direction' => 'outbound'
             ]);
 
