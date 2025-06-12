@@ -1,66 +1,87 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Twilio Bridge
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel-based bridge to integrate WhatsApp (via Twilio) with Chatwoot, enabling seamless two-way communication between WhatsApp users and Chatwoot agents. This project is designed for customer support scenarios where WhatsApp users interact with automated menus or are transferred to human agents using Chatwoot.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **WhatsApp Webhook Integration:** Receives and processes incoming WhatsApp messages via Twilio.
+- **Automated Menu:** Presents users with a menu (e.g., check insurance status, talk to an agent) and handles their responses.
+- **Chatwoot Handover:** Transfers conversations to Chatwoot agents when requested by the user.
+- **Two-way Messaging:** Forwards messages and media between WhatsApp users and Chatwoot agents.
+- **Attachment Support:** Handles media files sent from WhatsApp to Chatwoot and vice versa.
+- **Conversation Tracking:** Stores conversation and message history in the database.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## How It Works
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. **User sends a WhatsApp message** to your Twilio number.
+2. **Twilio forwards the message** to `/api/whatsapp/webhook`.
+3. The system:
+   - Greets the user and presents a menu (e.g., check insurance status, talk to an agent).
+   - Handles menu responses. If the user requests an agent, a Chatwoot conversation is created or continued.
+   - Forwards messages and attachments to Chatwoot if the conversation is with an agent.
+4. **Chatwoot agents reply** in Chatwoot. Outgoing messages are sent to `/api/chatwoot/webhook` and relayed to the user's WhatsApp via Twilio.
 
-## Learning Laravel
+## API Endpoints
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- `POST /api/whatsapp/webhook` — Receives WhatsApp messages from Twilio.
+- `POST /api/chatwoot/webhook` — Receives outgoing messages from Chatwoot to be sent to WhatsApp users.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Main Components
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Controllers:**
+  - `WhatsAppController`: Handles WhatsApp webhook, menu logic, and forwards messages to Chatwoot.
+  - `ChatwootWebhookController`: Handles Chatwoot webhook and sends agent replies to WhatsApp via Twilio.
+- **Services:**
+  - `ChatwootService`: Integrates with Chatwoot API for contact and conversation management, and message forwarding.
+- **Models:**
+  - `Conversation`: Tracks WhatsApp user sessions and Chatwoot linkage.
+  - `Message`: Stores individual message history.
 
-## Laravel Sponsors
+## Setup
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+1. **Clone the repository:**
+   ```bash
+   git clone <repo-url>
+   cd laravel-twilio-bridge
+   ```
+2. **Install dependencies:**
+   ```bash
+   composer install
+   ```
+3. **Copy and configure environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Twilio and Chatwoot credentials
+   ```
+4. **Generate application key:**
+   ```bash
+   php artisan key:generate
+   ```
+5. **Run migrations:**
+   ```bash
+   php artisan migrate
+   ```
+6. **Set up webhooks:**
+   - Configure Twilio to send WhatsApp messages to `/api/whatsapp/webhook`.
+   - Configure Chatwoot to send outgoing messages to `/api/chatwoot/webhook`.
 
-### Premium Partners
+## Environment Variables
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+Set the following variables in your `.env` file:
 
-## Contributing
+```
+# Twilio
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_NUMBER=whatsapp:+...
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Chatwoot
+CHATWOOT_URL=https://your-chatwoot-instance.com
+CHATWOOT_API_TOKEN=...
+CHATWOOT_ACCOUNT_ID=...
+CHATWOOT_INBOX_ID=...
+```
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open-sourced under the MIT license.
